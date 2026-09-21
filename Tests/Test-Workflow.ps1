@@ -54,31 +54,75 @@ function New-PSSession {
 function Remove-PSSession { param($Session,$ErrorAction) }
 function Invoke-Command {
     param($Session,$ScriptBlock,$ArgumentList,$ErrorAction)
-    [pscustomobject]@{ Kind = 'Inventory'; Type = 'Services'; Resource = 'FakeService'; Account = 'EXAMPLE\demo'; State = 'Stopped'; Details = 'Fixture' }
-    [pscustomobject]@{ Kind = 'Inventory'; Type = 'Services'; Resource = 'LocalService'; Account = 'LOCAL\demo'; State = 'Running'; Details = 'Fixture' }
-    foreach ($type in @('Services','ScheduledTasks','IIS','LocalAdministrators','Processes')) {
-        $state = 'Success'
-        if ($type -eq 'Processes') { $state = 'Skipped' }
-        [pscustomobject]@{ Kind = 'Status'; Type = $type; Status = $state; Message = '' }
+    # Run the actual remote collector with fabricated OS responses and translation.
+    $fakeTranslation = @'
+function ConvertTo-AuditSid {
+    param($Identity)
+    if ($Identity -eq 'EXAMPLE\demo') { return [pscustomobject]@{ Value = 'S-1-5-21-1000000001-1000000002-1000000003-1101' } }
+    if ($Identity -eq 'APP01\demo') { return [pscustomobject]@{ Value = 'S-1-5-21-2000000001-2000000002-2000000003-1101' } }
+    throw 'Simulated unmapped identity'
+}
+function ConvertFrom-AuditSid {
+    param($Sid)
+    if ($Sid.Value -like '*-1000000003-*') { return 'EXAMPLE\demo' }
+    return 'APP01\demo'
+}
+'@
+    & $ScriptBlock $ArgumentList[0] ($ArgumentList[1] + "`n" + $fakeTranslation)
+}
+function Get-CimInstance {
+    param($ClassName,$ErrorAction)
+    if ($Session.ComputerName -eq 'empty.example.test' -and $ClassName -ne 'Win32_ComputerSystem') { return }
+    switch ($ClassName) {
+        'Win32_ComputerSystem' { [pscustomobject]@{ Name = 'APP01'; DomainRole = 3 } }
+        'Win32_Service' {
+            [pscustomobject]@{ Name = 'FakeService'; DisplayName = 'Fictitious Service'; StartName = 'EXAMPLE\demo'; State = 'Stopped'; StartMode = 'Auto' }
+            [pscustomobject]@{ Name = 'LocalService'; DisplayName = 'Fictitious Local'; StartName = '.\demo'; State = 'Running'; StartMode = 'Auto' }
+            [pscustomobject]@{ Name = 'UnknownService'; DisplayName = 'Fictitious Unknown'; StartName = 'OTHER\missing'; State = 'Running'; StartMode = 'Auto' }
+        }
     }
+}
+function Get-ScheduledTask {
+    if ($Session.ComputerName -eq 'empty.example.test') { return }
+    [pscustomobject]@{ TaskName = 'OneDrive Startup Task-S-1-5-21-demo'; TaskPath = '\'; State = 'Ready'; Principal = [pscustomobject]@{ UserId = 'EXAMPLE\demo'; LogonType = 'Interactive'; RunLevel = 'Limited' } }
+}
+function Get-LocalGroupMember {
+    param($SID)
+    if ($Session.ComputerName -eq 'empty.example.test') { return }
+    throw 'Simulated collector access denied'
 }
 try {
     & "$root/Scripts/Get-PrivilegedUsers.ps1" -Server example.test -OutputFolder $temp
-    $csv = Join-Path $temp '01-PrivilegedUsers.csv'
+    $csv = Join-Path $temp '01-Privileged-Users.csv'
     $users = @(Import-Csv $csv -Delimiter ';')
     if ($users.Count -ne 2) { throw "Discovery expected 2 unique user/root pairs, got $($users.Count)." }
     if (@($users | Where-Object MembershipType -eq 'NestedPrimaryGroup').Count -ne 1) { throw 'Nested primary group not discovered.' }
-    $summary = Import-Csv (Join-Path $temp '04-PrivilegedGroupSummary.csv') -Delimiter ';'
+    $summary = Import-Csv (Join-Path $temp '02-Privileged-Groups-Summary.csv') -Delimiter ';'
     if (@($summary | Where-Object { $_.Group -eq "$domainSid-512" -and $_.GroupsVisited -eq 2 -and $_.Status -eq 'Complete' }).Count -ne 1) { throw 'Cycle traversal summary incorrect.' }
     & "$root/Scripts/Get-PrivilegedAccountDependencies.ps1" -PrivilegedCsv $csv -ComputerName app.example.test,offline.example.test -OutputFolder $temp
-    $dependencies = @(Import-Csv (Join-Path $temp '05-PrivilegedAccountDependencies.csv') -Delimiter ';')
-    if ($dependencies.Count -ne 1 -or $dependencies[0].ResourceStatus -ne 'Stopped') { throw 'Dependency integration match incorrect.' }
-    $scan = @(Import-Csv (Join-Path $temp '06-ServerScanStatus.csv') -Delimiter ';')
-    if (@($scan | Where-Object Status -eq 'Failed').Count -ne 5) { throw 'Unavailable target must fail all collectors.' }
+    $dependencies = @(Import-Csv (Join-Path $temp '03-Privileged-Service-Dependencies.csv') -Delimiter ';')
+    if ($dependencies.Count -ne 3) { throw 'Service inventory must retain all services.' }
+    $matched = @($dependencies | Where-Object IsPrivileged -eq 'True')
+    if ($matched.Count -ne 1 -or $matched[0].State -ne 'Stopped' -or $matched[0].DependencySeverity -ne 'Review') { throw 'Stopped automatic service match incorrect.' }
+    if (@($dependencies | Where-Object { $_.ResolvedAccountType -eq 'Local' -and $_.IsPrivileged -eq 'False' }).Count -ne 1) { throw 'Local collision incorrectly matched.' }
+    if (@($dependencies | Where-Object { $_.IsPrivileged -eq 'Unknown' -and $_.DependencySeverity -eq 'Review' }).Count -ne 1) { throw 'Unresolved identity lost.' }
+    $tasks = @(Import-Csv (Join-Path $temp '04-Scheduled-Task-Dependencies.csv') -Delimiter ';')
+    if ($tasks.Count -ne 1 -or $tasks[0].DependencyClassification -ne 'UserProfileArtifact' -or $tasks[0].DependencySeverity -ne 'Informational') { throw 'Profile artifact incorrectly promoted.' }
+    $scan = @(Import-Csv (Join-Path $temp '05-Server-Scan-Status.csv') -Delimiter ';')
+    if (@($scan | Where-Object { $_.Server -eq 'offline.example.test' -and $_.Status -eq 'Failed' }).Count -ne 5) { throw 'Unavailable target must fail all collectors.' }
+    if (@($scan | Where-Object { $_.Collector -eq 'Services' -and $_.Status -eq 'Partial' -and $_.ObservedCount -eq 3 -and $_.UnresolvedIdentityCount -eq 1 }).Count -ne 1) { throw 'Resolution gap missing from coverage.' }
+    if (@($scan | Where-Object { $_.Server -eq 'app.example.test' -and $_.Collector -eq 'LocalAdministrators' -and $_.Status -eq 'Failed' }).Count -ne 1) { throw 'Independent collector failure missing.' }
+    & "$root/Scripts/Get-PrivilegedAccountDependencies.ps1" -PrivilegedCsv $csv -ComputerName empty.example.test -OutputFolder $temp
+    foreach ($report in @('03-Privileged-Service-Dependencies.csv','04-Scheduled-Task-Dependencies.csv')) {
+        $file = Join-Path $temp $report
+        if (@(Import-Csv $file -Delimiter ';').Count -ne 0 -or (Get-Content $file -First 1) -notlike '*ResolutionError*') { throw 'Empty dependency report must retain stable headers.' }
+    }
+    $scan = @(Import-Csv (Join-Path $temp '05-Server-Scan-Status.csv') -Delimiter ';')
+    if (@($scan | Where-Object { $_.Collector -eq 'Services' -and $_.Status -eq 'Success' -and $_.ObservedCount -eq 0 }).Count -ne 1) { throw 'Successful empty scan must differ from failure.' }
     & "$root/Scripts/Get-PrivilegedAccountRisks.ps1" -PrivilegedCsv $csv -OutputFolder $temp
-    $risks = @(Import-Csv (Join-Path $temp '07-PrivilegedAccountRisks.csv') -Delimiter ';')
+    $risks = @(Import-Csv (Join-Path $temp '06-Privileged-Account-Risks.csv') -Delimiter ';')
     if ($risks.Count -ne 2 -or $risks[0].Findings -notlike '*DoesNotRequirePreAuth*') { throw 'Risk integration incorrect.' }
-    Write-Output 'PASS: 6 simulated workflow checks. Remote collector bodies still require live lab validation.'
+    Write-Output 'PASS: simulated discovery, remote collector, split reports, identity gaps, collector failures and risks. Live AD/WinRM not tested.'
 }
 finally {
     if (Test-Path -LiteralPath $temp) {

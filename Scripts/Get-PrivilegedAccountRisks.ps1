@@ -3,7 +3,7 @@
 .SYNOPSIS
 Re-queries discovered users by SID and exports review indicators and query status.
 .EXAMPLE
-.\Get-PrivilegedAccountRisks.ps1 -PrivilegedCsv C:\Audit\Run01\01-PrivilegedUsers.csv
+.\Get-PrivilegedAccountRisks.ps1 -PrivilegedCsv C:\Audit\Run01\01-Privileged-Users.csv
 #>
 [CmdletBinding()]
 param(
@@ -35,6 +35,6 @@ foreach ($account in ($accounts | Sort-Object SID -Unique)) {
     }
     catch { $status.Add([pscustomobject]@{ SID = $account.SID; Status = 'Failed'; Message = $_.Exception.Message }) }
 }
-Export-AuditCsv -Rows $results.ToArray() -Columns SID,SamAccountName,Enabled,PrivilegedGroups,FindingCount,Findings,LastLogonDate,PasswordLastSet,SPNs,SIDHistory -Path (Join-Path $OutputFolder '07-PrivilegedAccountRisks.csv')
+Export-AuditCsv -Rows $results.ToArray() -Columns SID,SamAccountName,Enabled,PrivilegedGroups,FindingCount,Findings,LastLogonDate,PasswordLastSet,SPNs,SIDHistory -Path (Join-Path $OutputFolder '06-Privileged-Account-Risks.csv')
 Export-AuditCsv -Rows $status.ToArray() -Columns SID,Status,Message -Path (Join-Path $OutputFolder 'RiskQueryStatus.csv')
 if (@($status | Where-Object Status -eq 'Failed').Count) { Write-Warning 'Some accounts could not be assessed. Review RiskQueryStatus.csv.' }

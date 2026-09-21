@@ -102,7 +102,7 @@ foreach ($target in $targets) {
     if (!$rootGroup) { $coverage = 'Failed' }
     $summary.Add([pscustomobject]@{ Group = $target.Identity; DirectoryServer = $target.Server; UniqueUsers = $found.Count; GroupsVisited = $visited.Count; Status = $coverage })
 }
-Export-AuditCsv -Rows @($rows.ToArray() | Sort-Object PrivilegedGroup,SamAccountName) -Columns SID,DirectoryServer,DomainNetBIOS,SamAccountName,UserPrincipalName,DisplayName,Enabled,ActivityStatus,LastLogonDate,PasswordLastSet,PrivilegedGroup,GroupSID,MembershipType -Path (Join-Path $OutputFolder '01-PrivilegedUsers.csv')
-Export-AuditCsv -Rows $summary.ToArray() -Columns Group,DirectoryServer,UniqueUsers,GroupsVisited,Status -Path (Join-Path $OutputFolder '04-PrivilegedGroupSummary.csv')
+Export-AuditCsv -Rows @($rows.ToArray() | Sort-Object PrivilegedGroup,SamAccountName) -Columns SID,DirectoryServer,DomainNetBIOS,SamAccountName,UserPrincipalName,DisplayName,Enabled,ActivityStatus,LastLogonDate,PasswordLastSet,PrivilegedGroup,GroupSID,MembershipType -Path (Join-Path $OutputFolder '01-Privileged-Users.csv')
+Export-AuditCsv -Rows $summary.ToArray() -Columns Group,DirectoryServer,UniqueUsers,GroupsVisited,Status -Path (Join-Path $OutputFolder '02-Privileged-Groups-Summary.csv')
 Export-AuditCsv -Rows $status.ToArray() -Columns Target,Stage,Status,Message -Path (Join-Path $OutputFolder 'DiscoveryStatus.csv')
 if ($status.Count) { Write-Warning 'Discovery has coverage gaps. Review DiscoveryStatus.csv and the group summary.' }

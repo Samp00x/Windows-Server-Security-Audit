@@ -1,6 +1,0 @@
-"Server";"Collector";"Status";"Message"
-"app01.example.test";"Services";"Success";""
-"app01.example.test";"ScheduledTasks";"Success";""
-"app01.example.test";"IIS";"NotApplicable";"IIS configuration not present."
-"app01.example.test";"LocalAdministrators";"Success";""
-"app01.example.test";"Processes";"Skipped";"Use -ScanProcesses to enable."

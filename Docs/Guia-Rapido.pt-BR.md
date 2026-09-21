@@ -24,18 +24,20 @@ Execute as próximas etapas **na mesma janela**, pois elas reutilizam essas vari
 .\Scripts\Get-PrivilegedUsers.ps1 -Server $dc -OutputFolder $pasta
 ```
 
-Abra `01-PrivilegedUsers.csv` para ver os usuários e `04-PrivilegedGroupSummary.csv` para conferir os grupos. Verifique também `DiscoveryStatus.csv`: se houver falhas, corrija ou documente as lacunas antes de continuar. Um arquivo de status somente com cabeçalho indica que não foram registrados problemas nessa coleta.
+Abra `01-Privileged-Users.csv` para ver os usuários e `02-Privileged-Groups-Summary.csv` para conferir os grupos. Verifique também `DiscoveryStatus.csv`: se houver falhas, corrija ou documente as lacunas antes de continuar. Um arquivo de status somente com cabeçalho indica que não foram registrados problemas nessa coleta.
 
 O mesmo usuário pode aparecer mais de uma vez se pertencer a mais de um grupo privilegiado. Não remova as colunas do CSV: os próximos scripts precisam delas.
 
 ## 3. Veja onde essas contas estão configuradas
 
 ```powershell
-$usuarios = Join-Path $pasta '01-PrivilegedUsers.csv'
+$usuarios = Join-Path $pasta '01-Privileged-Users.csv'
 .\Scripts\Get-PrivilegedAccountDependencies.ps1 -PrivilegedCsv $usuarios -ComputerName $servidores -OutputFolder $pasta
 ```
 
-O script verifica serviços, tarefas agendadas, pools IIS e membros diretos de Administradores locais. Leia primeiro `06-ServerScanStatus.csv` e depois `05-PrivilegedAccountDependencies.csv`. Consulte `DependencyInventory.csv` para identidades sem correspondência e grupos que precisam de revisão manual.
+O script verifica serviços, tarefas agendadas, pools IIS e membros diretos de Administradores locais. Leia primeiro `05-Server-Scan-Status.csv` e depois `03-Privileged-Service-Dependencies.csv`. Consulte `DependencyInventory.csv` para identidades sem correspondência e grupos que precisam de revisão manual.
+
+Use `04-Scheduled-Task-Dependencies.csv` para tarefas e `Other-Privileged-Dependencies.csv` para os demais achados. Serviços automáticos privilegiados de domínio em execução ficam Critical; parados ficam Review. Tarefas conhecidas de perfil com logon interativo ficam UserProfileArtifact/Informational. Consulte a [interpretação detalhada](Dependency-Reports.pt-BR.md), incluindo as diferenças entre conta local e de domínio e as lacunas de resolução.
 
 Para incluir os processos em execução, acrescente `-ScanProcesses` ao comando. Isso demora mais e mostra apenas aquele momento. Para usar outra credencial nos servidores, acrescente `-Credential (Get-Credential)`; essa opção não altera a identidade usada pelos scripts de AD.
 
@@ -45,7 +47,7 @@ Para incluir os processos em execução, acrescente `-ScanProcesses` ao comando.
 .\Scripts\Get-PrivilegedAccountRisks.ps1 -PrivilegedCsv $usuarios -OutputFolder $pasta
 ```
 
-Leia `RiskQueryStatus.csv` para confirmar quais contas foram consultadas e `07-PrivilegedAccountRisks.csv` para ver os indicadores. A coluna `Findings` contém os pontos de revisão, por exemplo:
+Leia `RiskQueryStatus.csv` para confirmar quais contas foram consultadas e `06-Privileged-Account-Risks.csv` para ver os indicadores. A coluna `Findings` contém os pontos de revisão, por exemplo:
 
 | Indicador | Significado |
 | --- | --- |
@@ -63,7 +65,9 @@ Leia `RiskQueryStatus.csv` para confirmar quais contas foram consultadas e `07-P
 $pasta
 
 # Exemplo de leitura do relatório no PowerShell.
-Import-Csv (Join-Path $pasta '05-PrivilegedAccountDependencies.csv') -Delimiter ';' | Format-Table Server,UsageType,Resource,SamAccountName -AutoSize
+Import-Csv (Join-Path $pasta '03-Privileged-Service-Dependencies.csv') -Delimiter ';' |
+    Where-Object { $_.IsPrivileged -eq 'True' -or $_.DependencySeverity -eq 'Review' } |
+    Format-Table Server,ServiceName,State,StartMode,StartNameRaw,ResolvedAccountType,DependencySeverity -AutoSize
 ```
 
 No Excel, importe por **Dados → De Texto/CSV**, selecione UTF-8 e ponto e vírgula como separador. Trate as colunas como texto para preservar identidades e evitar interpretação de fórmulas.

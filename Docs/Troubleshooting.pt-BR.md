@@ -24,4 +24,6 @@
 
 ## Como relatar um problema
 
+Para identidades Unresolved ou cobertura Partial, consulte `ResolutionError` no relatório de serviços/tarefas ou no `DependencyInventory.csv`, e `UnresolvedIdentityCount` no relatório 05. A tradução usa o Windows do alvo: confira conectividade/confiança do domínio, contas excluídas e nomes qualificados. `.\Administrator` é local ao servidor membro, nunca correspondência de domínio apenas pelo nome. Veja as [regras de identidade e severidade](Dependency-Reports.pt-BR.md). Tarefas com nome de perfil e logon não interativo exigem revisão.
+
 Informe o script, versões de Windows/PowerShell, situação do coletor, comportamento esperado e uma reprodução mínima **fictícia**. Remova domínios, usuários, SIDs, nomes de servidores e caminhos de exceções que identifiquem o ambiente. Nunca anexe CSVs de produção, credenciais ou arquivos de clientes a uma issue pública.

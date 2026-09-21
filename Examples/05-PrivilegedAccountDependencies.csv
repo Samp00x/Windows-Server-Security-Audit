@@ -1,2 +1,0 @@
-"Server";"UsageType";"Resource";"AccountConfigured";"SID";"SamAccountName";"ResourceStatus";"PrivilegedGroups";"Details"
-"app01.example.test";"Services";"FictitiousDemoService";"EXAMPLE\svc.demo";"S-1-5-21-1000000001-1000000002-1000000003-1101";"svc.demo";"Stopped";"Domain Admins";"StartMode=Manual"
