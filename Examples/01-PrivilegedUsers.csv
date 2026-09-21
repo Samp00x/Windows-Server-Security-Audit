@@ -1,0 +1,2 @@
+"SID";"DirectoryServer";"DomainNetBIOS";"SamAccountName";"UserPrincipalName";"DisplayName";"Enabled";"ActivityStatus";"LastLogonDate";"PasswordLastSet";"PrivilegedGroup";"GroupSID";"MembershipType"
+"S-1-5-21-1000000001-1000000002-1000000003-1101";"example.test";"EXAMPLE";"svc.demo";"svc.demo@example.test";"Fictitious Demo Service";"True";"Active";"2026-01-01T00:00:00.0000000Z";"2025-12-01T00:00:00.0000000Z";"Domain Admins";"S-1-5-21-1000000001-1000000002-1000000003-512";"Nested"

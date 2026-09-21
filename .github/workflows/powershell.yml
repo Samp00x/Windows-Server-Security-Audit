@@ -1,0 +1,14 @@
+name: PowerShell offline checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse and run regression checks on Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          ./Tests/Test-Toolkit.ps1
+          ./Tests/Test-Workflow.ps1

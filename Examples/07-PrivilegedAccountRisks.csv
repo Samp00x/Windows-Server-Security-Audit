@@ -1,0 +1,2 @@
+"SID";"SamAccountName";"Enabled";"PrivilegedGroups";"FindingCount";"Findings";"LastLogonDate";"PasswordLastSet";"SPNs";"SIDHistory"
+"S-1-5-21-1000000001-1000000002-1000000003-1101";"svc.demo";"True";"Domain Admins";"1";"PasswordNeverExpires";"2026-01-01T00:00:00.0000000Z";"2025-12-01T00:00:00.0000000Z";"";""

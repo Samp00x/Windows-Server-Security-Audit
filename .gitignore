@@ -1,0 +1,27 @@
+# All runtime reports and customer inputs stay out of source control.
+/Output/*
+!/Output/.gitkeep
+*.csv
+!/Examples/*.csv
+*.log
+*.clixml
+*.etl
+*.evtx
+*.zip
+*.xlsx
+*.xls
+*.json
+*.xml
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+.env*
+Credentials/
+Inputs/
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+TestResults/
