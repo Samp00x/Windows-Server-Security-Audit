@@ -1,5 +1,7 @@
 # Troubleshooting
 
+[Português (Brasil)](Troubleshooting.pt-BR.md)
+
 | Symptom | Check and action |
 | --- | --- |
 | ActiveDirectory module missing | Use Windows PowerShell 5.1 and install approved RSAT AD tools through your normal administration process. |

@@ -1,5 +1,7 @@
 # Windows Server / Active Directory Security Audit
 
+**English** | [Português (Brasil)](README.pt-BR.md) | [Guia rápido em português](Docs/Guia-Rapido.pt-BR.md)
+
 A read-only PowerShell toolkit for reviewing privileged AD users, locating server dependencies, and flagging account settings for human review. It does not remove memberships, disable users, rotate passwords, or change server configuration.
 
 ## What it does

@@ -1,5 +1,7 @@
 # Audit workflow
 
+[Português (Brasil)](Audit-Workflow.pt-BR.md)
+
 1. **Define scope.** Record the approved domains, server list, account owner contacts, maintenance constraints and review thresholds outside this repository. Use a dedicated report folder per domain and run. Confirm read access and remoting with one lab target first.
 2. **Discover privileges.** Run `Get-PrivilegedUsers.ps1`. Include custom administrative groups with `-AdditionalGroup`. Review every partial/failed group and every unsupported principal in the status report. Resolve coverage gaps or explicitly document exclusions before using the user list.
 3. **Locate dependencies.** Supply the discovery CSV and an explicit list of approved server FQDNs to `Get-PrivilegedAccountDependencies.ps1`. Start with a small batch. Add process collection only when needed. Inspect the scan status before the matched report, then review unmatched inventory, local administrative groups and task group principals manually.
