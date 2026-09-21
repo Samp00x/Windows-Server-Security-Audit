@@ -12,6 +12,8 @@
 
 ## Execução prática
 
+Use o [guia de dependências](Dependency-Reports.pt-BR.md) para separar serviços confirmados, tarefas não assistidas, artefatos interativos de perfil e lacunas de cobertura. Priorize o relatório 03 pela severidade após revisar o 05. Compare contas locais e de domínio pelo SID completo; nome Administrator ou RID 500 iguais não bastam.
+
 Use `Get-Help .\Scripts\Get-PrivilegedUsers.ps1 -Full` para consultar a ajuda do script. Uma lista local de servidores em arquivo texto pode ser lida com `Get-Content` e passada para `-ComputerName`; não versione essa lista. A autenticação integrada do Windows é o padrão. Credenciais opcionais de acesso aos servidores permanecem em memória e não são exportadas.
 
 O scanner cria uma sessão remota por alvo, processa os servidores sequencialmente e fecha as sessões em `finally`. `-OperationTimeoutSeconds` controla o tempo limite de operação da comunicação remota, não um prazo total garantido para cada coletor. Evite lotes muito grandes.

@@ -12,6 +12,8 @@
 
 ## Practical execution
 
+Use the [dependency report guide](Dependency-Reports.md) to separate confirmed service dependencies, unattended tasks, interactive profile artifacts and coverage gaps. Prioritize report 03 by severity after reviewing report 05. Compare local and domain identities by full SID; matching the name Administrator or RID 500 is insufficient.
+
 Use `Get-Help .\Scripts\Get-PrivilegedUsers.ps1 -Full` for script help. For server batches, a locally maintained text file can be read with `Get-Content` and passed to `-ComputerName`; do not commit that target list. Windows integrated authentication is used by default. Optional server credentials remain in memory and are never exported.
 
 The scanner uses one remoting session per target, processes targets sequentially and closes sessions in `finally`. `-OperationTimeoutSeconds` controls the remoting operation timeout, not a guaranteed total wall-clock deadline for every collector. Avoid oversized server batches.

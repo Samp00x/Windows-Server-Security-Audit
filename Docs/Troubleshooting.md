@@ -24,4 +24,6 @@
 
 ## Escalating a defect
 
+For Unresolved identities or Partial identity coverage, inspect `ResolutionError` in the service/task report or `DependencyInventory.csv`, and `UnresolvedIdentityCount` in report 05. Resolution uses the target's Windows identity lookup, so check its domain connectivity and trust, deleted identities and qualified names. `.\Administrator` is target-local on a member server, never a name-only domain match. See [identity and severity rules](Dependency-Reports.md). Profile-like tasks with non-interactive logon require review rather than automatic artifact classification.
+
 Provide the script name, Windows/PowerShell versions, collector status, expected behavior and a minimal **fictitious** reproduction. Redact domains, usernames, SIDs, server names and exception paths. Never attach production CSVs, credentials or client files to a public issue.

@@ -1,0 +1,6 @@
+"Server";"Collector";"Status";"ObservedCount";"UnresolvedIdentityCount";"Message"
+"app01.example.test";"Services";"Partial";"5";"1";"1 configured identities unresolved; see inventory resolution errors."
+"app01.example.test";"ScheduledTasks";"Success";"6";"0";""
+"app01.example.test";"IIS";"NotApplicable";"0";"0";"IIS configuration not present."
+"app01.example.test";"LocalAdministrators";"Success";"0";"0";""
+"app01.example.test";"Processes";"Skipped";"0";"0";"Use -ScanProcesses to enable."

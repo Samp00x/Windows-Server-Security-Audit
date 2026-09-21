@@ -30,8 +30,8 @@ Baixe ou clone o repositório e abra o Windows PowerShell na pasta principal. Su
 $run = Join-Path $PWD ('Output/' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 .\Scripts\Get-PrivilegedUsers.ps1 -Server 'dc01.example.test' -OutputFolder $run
 
-# Revise DiscoveryStatus.csv e 04-PrivilegedGroupSummary.csv antes de continuar.
-$accounts = Join-Path $run '01-PrivilegedUsers.csv'
+# Revise DiscoveryStatus.csv e 02-Privileged-Groups-Summary.csv antes de continuar.
+$accounts = Join-Path $run '01-Privileged-Users.csv'
 .\Scripts\Get-PrivilegedAccountDependencies.ps1 -PrivilegedCsv $accounts `
     -ComputerName 'app01.example.test','web01.example.test' -OutputFolder $run
 .\Scripts\Get-PrivilegedAccountRisks.ps1 -PrivilegedCsv $accounts -OutputFolder $run
@@ -45,14 +45,18 @@ Os CSVs usam UTF-8, ponto e vírgula como separador, cabeçalhos estáveis mesmo
 
 | Relatório | Conteúdo |
 | --- | --- |
-| `01-PrivilegedUsers.csv` | Uma linha por SID de usuário e grupo privilegiado de origem; inclui a identidade com domínio para cruzamento. |
-| `04-PrivilegedGroupSummary.csv` | Usuários encontrados, grupos percorridos e cobertura por grupo solicitado. Quando parcial, a contagem representa somente o que foi encontrado. |
+| `01-Privileged-Users.csv` | Uma linha por SID de usuário e grupo privilegiado de origem; inclui a identidade com domínio para cruzamento. |
+| `02-Privileged-Groups-Summary.csv` | Usuários encontrados, grupos percorridos e cobertura por grupo solicitado. Quando parcial, a contagem representa somente o que foi encontrado. |
 | `DiscoveryStatus.csv` | Grupos ausentes, objetos não suportados e falhas na leitura do diretório. |
-| `05-PrivilegedAccountDependencies.csv` | Correspondências exatas por SID, UPN ou nome qualificado com domínio NetBIOS. |
-| `06-ServerScanStatus.csv` | Situação de cada coletor em cada servidor: Success, Partial, Failed, Skipped ou NotApplicable. |
+| `03-Privileged-Service-Dependencies.csv` | Todos os serviços Windows, SID resolvido no alvo, tipo de conta, privilégios, severidade e explicação. |
+| `04-Scheduled-Task-Dependencies.csv` | Todas as tarefas, com artefatos interativos de perfil separados das dependências não assistidas. |
+| `05-Server-Scan-Status.csv` | Situação de cada coletor em cada servidor: Success, Partial, Failed, Skipped ou NotApplicable. |
 | `DependencyInventory.csv` | Todas as identidades configuradas observadas, inclusive contas sem correspondência e grupos para revisão manual. |
-| `07-PrivilegedAccountRisks.csv` | Uma linha por SID consultado com sucesso, com os indicadores individuais de revisão. |
+| `06-Privileged-Account-Risks.csv` | Uma linha por SID consultado com sucesso, com os indicadores individuais de revisão. |
 | `RiskQueryStatus.csv` | Sucesso ou falha de cada consulta de conta solicitada. |
+| `Other-Privileged-Dependencies.csv` | Correspondências por SID em IIS, Administradores locais diretos e processos opcionais. |
+
+Veja [Evidências e regras de severidade](Docs/Dependency-Reports.pt-BR.md) para colunas, resolução de identidade, migração dos nomes e revisão. Leia primeiro o relatório 05 e depois o 03. Serviços automáticos em execução com SID privilegiado de domínio ficam Critical; outros serviços privilegiados em execução, High; automáticos privilegiados parados, Review. Tarefas de perfil com logon interativo ficam Informational. `IsPrivileged=False` significa ausência de correspondência no inventário fornecido, não ausência de todos os privilégios.
 
 **Não encontrar dependências não comprova que uma conta está sem uso.** Revise cobertura e inventário antes de qualquer alteração. Um serviço parado ou uma tarefa desabilitada ainda pode depender da identidade configurada. Um indicador de risco não determina que o acesso seja desnecessário; a decisão precisa do responsável pela conta ou aplicação.
 
@@ -61,7 +65,7 @@ Os CSVs usam UTF-8, ponto e vírgula como separador, cabeçalhos estáveis mesmo
 - O levantamento cobre os grupos selecionados, não todos os caminhos possíveis de privilégio. Delegações por ACL no AD, direitos em GPOs, AD CS, relações de confiança, ACLs de recursos e permissões de aplicações exigem avaliação separada. Atributos históricos `adminCount` e exportações de delegações estão fora deste fluxo compacto.
 - Execute o levantamento separadamente para cada domínio, em pastas distintas. Os grupos do domínio raiz são incluídos, mas não há auditoria automática de toda a floresta. Principais de segurança externos (foreign security principals) e objetos que não são usuários são registrados para revisão manual.
 - Administradores locais e grupos usados como identidade de tarefas são inventariados diretamente; o script de dependências **não expande os membros desses grupos**. Um usuário pode ter acesso local indireto sem aparecer no relatório de correspondências. Controladores de domínio não possuem um grupo Administradores em SAM local; revise o grupo Builtin do domínio.
-- O cruzamento preserva o domínio da identidade. Nomes sem domínio, aliases ausentes do relatório, contas renomeadas e identidades não resolvidas precisam de validação manual. `NotMatched` não significa ausência de privilégio.
+- A tradução ocorre no alvo e o cruzamento usa apenas SIDs completos. Aliases DNS/NetBIOS e UPNs podem corresponder quando resolvidos pelo Windows. Nomes sem qualificador continuam ambíguos. Identidades não resolvidas preservam erros e geram cobertura Partial; `NotMatched` não significa ausência de privilégio.
 - `LastLogonDate` é replicado, aproximado e pode estar defasado. Ausência de logon registrado não comprova ausência de uso. Consulte os DCs relevantes e os registros de segurança/aplicações antes de concluir inatividade.
 - Dependências fora dos coletores listados, como scripts, SQL Agent, credenciais de aplicações, clusters, credenciais armazenadas e servidores offline, não estão cobertas. Processos representam apenas o instante da coleta.
 - Cobertura indica que a consulta configurada terminou, não que a conta utilizada consegue enxergar todos os recursos protegidos. Valide em laboratório representativo antes do uso em produção.
@@ -76,7 +80,7 @@ Tests/         Testes sem rede e integração contínua no Windows
 Output/        Relatórios ignorados pelo Git; somente .gitkeep é versionado
 ```
 
-Consulte o [fluxo de auditoria](Docs/Audit-Workflow.pt-BR.md) e a [solução de problemas](Docs/Troubleshooting.pt-BR.md). Execute os testes com `powershell.exe -NoProfile -File .\Tests\Test-Toolkit.ps1` e depois `powershell.exe -NoProfile -File .\Tests\Test-Workflow.ps1`. Eles verificam sintaxe, lógica e fluxos simulados; não substituem testes reais de AD/WinRM.
+Consulte o [fluxo de auditoria](Docs/Audit-Workflow.pt-BR.md) e a [solução de problemas](Docs/Troubleshooting.pt-BR.md). Execute `powershell.exe -NoProfile -File .\Tests\Test-Toolkit.ps1`, `powershell.exe -NoProfile -File .\Tests\Test-Dependencies.ps1` e `powershell.exe -NoProfile -File .\Tests\Test-Workflow.ps1`. Verificam sintaxe, identidades, severidades e coletores/fluxos simulados; não substituem testes reais de AD/WinRM.
 
 ## Tratamento dos dados
 

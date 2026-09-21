@@ -64,3 +64,5 @@ finally {
     if (Test-Path -LiteralPath $temp) { Remove-Item -LiteralPath $temp }
 }
 Write-Output "PASS: $checks offline regression checks. Live AD and remoting were not tested."
+# Include dependency checks in the existing Windows CI entry point.
+& "$PSScriptRoot/Test-Dependencies.ps1"

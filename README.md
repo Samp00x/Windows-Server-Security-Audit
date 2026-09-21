@@ -30,8 +30,8 @@ Clone or download this repository. Open Windows PowerShell at its root. Replace 
 $run = Join-Path $PWD ('Output/' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 .\Scripts\Get-PrivilegedUsers.ps1 -Server 'dc01.example.test' -OutputFolder $run
 
-# Review DiscoveryStatus.csv and 04-PrivilegedGroupSummary.csv before proceeding.
-$accounts = Join-Path $run '01-PrivilegedUsers.csv'
+# Review DiscoveryStatus.csv and 02-Privileged-Groups-Summary.csv before proceeding.
+$accounts = Join-Path $run '01-Privileged-Users.csv'
 .\Scripts\Get-PrivilegedAccountDependencies.ps1 -PrivilegedCsv $accounts `
     -ComputerName 'app01.example.test','web01.example.test' -OutputFolder $run
 .\Scripts\Get-PrivilegedAccountRisks.ps1 -PrivilegedCsv $accounts -OutputFolder $run
@@ -45,14 +45,18 @@ All CSVs use UTF-8, semicolon delimiters, stable headers (even with zero results
 
 | Report | Meaning |
 | --- | --- |
-| `01-PrivilegedUsers.csv` | One row per user SID and privileged root group; includes domain-qualified identity for matching. |
-| `04-PrivilegedGroupSummary.csv` | Users found, groups visited and coverage per requested group. Counts are lower bounds when partial. |
+| `01-Privileged-Users.csv` | One row per user SID and privileged root group; includes domain-qualified identity for matching. |
+| `02-Privileged-Groups-Summary.csv` | Users found, groups visited and coverage per requested group. Counts are lower bounds when partial. |
 | `DiscoveryStatus.csv` | Missing groups, unsupported objects and failed directory reads. |
-| `05-PrivilegedAccountDependencies.csv` | Exact SID, UPN or NetBIOS-qualified matches to discovered accounts. |
-| `06-ServerScanStatus.csv` | Per-server, per-collector Success, Partial, Failed, Skipped or NotApplicable. |
+| `03-Privileged-Service-Dependencies.csv` | All Windows services, target-resolved SIDs, domain/local/built-in scope, privilege match, severity and explanation. |
+| `04-Scheduled-Task-Dependencies.csv` | All scheduled tasks; interactive profile artifacts are classified separately from unattended dependencies. |
+| `05-Server-Scan-Status.csv` | Per-server, per-collector Success, Partial, Failed, Skipped or NotApplicable. |
 | `DependencyInventory.csv` | All observed configured identities, including unmatched accounts and group principals for manual follow-up. |
-| `07-PrivilegedAccountRisks.csv` | One row per successfully queried SID, with individual review indicators. |
+| `06-Privileged-Account-Risks.csv` | One row per successfully queried SID, with individual review indicators. |
 | `RiskQueryStatus.csv` | Success or failure for every requested account query. |
+| `Other-Privileged-Dependencies.csv` | SID matches for IIS, direct local Administrators and optional processes. |
+
+See [Dependency evidence and severity rules](Docs/Dependency-Reports.md) for the columns, identity resolution, sequential report migration and review workflow. Start with report 05 for coverage, then report 03 for services. Running automatic services under discovered privileged domain SIDs are Critical; other running privileged services are High; stopped automatic privileged services are Review. Profile tasks are Informational when their logon is interactive. `IsPrivileged=False` means no match in the supplied SID inventory, not proof of no privileges.
 
 **No matches is not proof that an account is unused.** Review coverage and inventory before making changes. A stopped service or disabled task can still depend on a configured identity. Risk indicators do not establish that access is unnecessary; obtain an owner decision.
 
@@ -61,7 +65,7 @@ All CSVs use UTF-8, semicolon delimiters, stable headers (even with zero results
 - Discovery covers selected groups, not all possible privilege paths. AD ACL delegation, GPO rights, AD CS, trusts, resource ACLs and application permissions need separate assessment. Historical `adminCount` and delegation exports are intentionally outside this compact workflow.
 - Run discovery separately for each domain you intend to audit, using separate output folders. Forest-root groups are included, but this is not an automatic forest-wide audit. Foreign security principals and non-user objects are recorded for manual review, not silently treated as users.
 - Local Administrators and task group principals are inventoried directly; group members are **not expanded** by the dependency scanner. A privileged user may therefore have indirect local access without appearing in the matched report. Domain controllers have no local SAM Administrators group; review their domain Builtin group.
-- Matching never strips domain qualifiers. Bare usernames, aliases not present in the AD report, renamed accounts and unresolved identities require manual validation. `NotMatched` does not mean non-privileged.
+- Identity translation runs on each target; privilege matching uses full SIDs only. DNS/NetBIOS aliases and UPNs can match when Windows resolves them. Bare names remain ambiguous. Unresolved identities retain errors and mark coverage Partial; `NotMatched` does not mean non-privileged.
 - Replicated `LastLogonDate` is approximate and can lag. No recorded logon is not proof of no use. Check all relevant DCs and workload/security logs before concluding inactivity.
 - Dependencies outside the listed collectors (scripts, SQL Agent, application credentials, clusters, stored credentials and offline servers) are not covered. Processes are only a snapshot.
 - Coverage means the configured query completed; it does not guarantee the querying identity can see every protected resource. Test in a representative lab before production use.
@@ -76,7 +80,7 @@ Tests/         Offline regression checks and Windows CI
 Output/        Ignored runtime reports; only .gitkeep is tracked
 ```
 
-See [Audit workflow](Docs/Audit-Workflow.md) and [Troubleshooting](Docs/Troubleshooting.md). Run offline checks with `powershell.exe -NoProfile -File .\Tests\Test-Toolkit.ps1`, then `powershell.exe -NoProfile -File .\Tests\Test-Workflow.ps1`. These check syntax, key logic and simulated workflows; they do not replace a live AD/WinRM test.
+See [Audit workflow](Docs/Audit-Workflow.md) and [Troubleshooting](Docs/Troubleshooting.md). Run offline checks with `powershell.exe -NoProfile -File .\Tests\Test-Toolkit.ps1`, `powershell.exe -NoProfile -File .\Tests\Test-Dependencies.ps1` and `powershell.exe -NoProfile -File .\Tests\Test-Workflow.ps1`. These check syntax, identity and severity logic and simulated collectors/workflows; they do not replace a live AD/WinRM test.
 
 ## Data handling
 

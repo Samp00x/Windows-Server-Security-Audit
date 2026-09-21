@@ -47,6 +47,52 @@ function Resolve-AuditAccount {
     }
 }
 
+function Get-AuditDependencyFinding {
+    param($Item, [string]$IsPrivileged)
+    $severity = 'Informational'
+    $classification = 'ConfiguredDependency'
+    $reason = 'Configured identity is not in the supplied privileged SID inventory; this does not prove least privilege.'
+    if ($Item.Type -eq 'ScheduledTasks') {
+        $name = ($Item.Resource -split '\\')[-1]
+        $profileName = $name -match '^(OneDrive (Startup|Reporting)( Task)?(?:-|$)|CreateExplorerShellUnelevatedTask(?:-|$)|User_Feed_Synchronization(?:-|$)|GoogleUserPEH(?:Core)?(?:Task)?(?:-|$))'
+        if ($profileName -and $Item.LogonType -in @('Interactive','InteractiveToken','3')) {
+            return [pscustomobject]@{ Severity = 'Informational'; Classification = 'UserProfileArtifact'; Reason = 'Known per-user task name with interactive logon. Evidence of a user profile, not an unattended service-account dependency. Name is a heuristic, not a trust decision; inspect actions if unexpected.' }
+        }
+        if ($profileName) {
+            return [pscustomobject]@{ Severity = 'Review'; Classification = 'Review'; Reason = 'Profile-like task name with non-interactive or unknown logon type; verify its principal and actions before treating it as a profile artifact.' }
+        }
+        if ($IsPrivileged -eq 'True') {
+            $severity = 'High'
+            if ($Item.State -eq 'Disabled') { $severity = 'Review' }
+            $reason = 'Scheduled task is configured with a privileged SID. Validate workload ownership and required rights before changing the account.'
+        }
+    }
+    elseif ($Item.Type -eq 'Services' -and $IsPrivileged -eq 'True') {
+        $severity = 'Review'
+        $reason = 'Service retains a privileged account configuration. It may need this identity at its next start; validate before account changes.'
+        if ($Item.State -eq 'Running') {
+            $severity = 'High'
+            if ($Item.StartMode -in @('Auto','Automatic') -and $Item.ResolvedAccountType -eq 'Domain') { $severity = 'Critical' }
+            $reason = 'Running Windows service uses a privileged account. Compromise can expose its privileges and account changes can interrupt the workload; migrate to a dedicated least-privilege identity after validation.'
+        }
+    }
+    if ($Item.Type -eq 'Services' -and $Item.State -eq 'Stopped' -and $Item.StartMode -in @('Auto','Automatic')) {
+        $severity = 'Review'
+        $reason = 'Automatic service is stopped but retains a configured identity. Validate its expected startup behavior and account dependency before changes.'
+    }
+    if ($Item.ResolvedAccountType -eq 'Unresolved' -or $IsPrivileged -eq 'Unknown') {
+        $severity = 'Review'
+        $reason = 'Identity resolution is incomplete. Privilege and account scope cannot be cleared; inspect ResolutionError and scan coverage.'
+    }
+    elseif ($Item.ResolvedAccountType -eq 'Local') {
+        $reason += ' Target-local account is distinct from a same-named domain account; review local rights separately.'
+    }
+    elseif ($Item.ResolvedAccountType -eq 'BuiltIn') {
+        $reason += ' Windows built-in or virtual identity; Informational does not imply low local privileges.'
+    }
+    [pscustomobject]@{ Severity = $severity; Classification = $classification; Reason = $reason }
+}
+
 function Get-AuditRiskFinding {
     param($User, [datetime]$Now = (Get-Date), [int]$InactiveDays = 90, [int]$PasswordAgeDays = 180)
     if (!$User.Enabled) { 'DisabledPrivilegedAccount' }
