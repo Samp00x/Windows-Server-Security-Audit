@@ -9,7 +9,7 @@ Conjunto de scripts PowerShell de **somente leitura** para levantar usuários pr
 | Script | Finalidade |
 | --- | --- |
 | `Scripts/Get-PrivilegedUsers.ps1` | Localiza usuários por associação direta, grupos aninhados e grupo primário; gera o relatório de usuários e um resumo da cobertura dos grupos. |
-| `Scripts/Get-PrivilegedAccountDependencies.ps1` | Consulta serviços, tarefas agendadas, pools do IIS, membros diretos de Administradores locais e, opcionalmente, processos em execução nos servidores informados. |
+| `Scripts/Get-PrivilegedAccountDependencies.ps1` | Consulta serviços, tarefas agendadas, pools do IIS, membros diretos de Administradores locais e, opcionalmente, processos em execução nos servidores descobertos pelo AD ou informados opcionalmente. |
 | `Scripts/Get-PrivilegedAccountRisks.ps1` | Consulta novamente os usuários pelo SID e sinaliza contas desabilitadas/inativas, configurações de senha, pré-autenticação Kerberos, delegação, SPNs e histórico de SIDs. |
 
 Grupos padrão: Domain Admins, Group Policy Creator Owners, Builtin Administrators, Account/Server/Print/Backup Operators, DnsAdmins e os grupos Schema/Enterprise Admins do domínio raiz da floresta. Inclua grupos personalizados com `-AdditionalGroup`. Grupos não encontrados aparecem como lacunas de cobertura, inclusive DnsAdmins quando não existe no domínio.
@@ -24,20 +24,19 @@ Grupos padrão: Domain Admins, Group Policy Creator Owners, Builtin Administrato
 
 ## Início rápido
 
-Baixe ou clone o repositório e abra o Windows PowerShell na pasta principal. Substitua os nomes fictícios pelos alvos autorizados:
+Baixe e extraia o repositório. Em uma máquina integrada ao domínio, abra o **Windows PowerShell 5.1 de 64 bits como administrador**, entre na pasta extraída e execute:
 
 ```powershell
-$run = Join-Path $PWD ('Output/' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-.\Scripts\Get-PrivilegedUsers.ps1 -Server 'dc01.example.test' -OutputFolder $run
-
-# Revise DiscoveryStatus.csv e 04-PrivilegedGroupSummary.csv antes de continuar.
-$accounts = Join-Path $run '01-PrivilegedUsers.csv'
-.\Scripts\Get-PrivilegedAccountDependencies.ps1 -PrivilegedCsv $accounts `
-    -ComputerName 'app01.example.test','web01.example.test' -OutputFolder $run
-.\Scripts\Get-PrivilegedAccountRisks.ps1 -PrivilegedCsv $accounts -OutputFolder $run
+.\Start-Audit.ps1
 ```
 
-O [guia rápido](Docs/Guia-Rapido.pt-BR.md) explica a execução passo a passo. Adicione `-ScanProcesses` para consultar os proprietários dos processos naquele momento; essa opção pode aumentar bastante o tempo de coleta. Ajuste os limites de revisão com `-InactiveDays 90` e `-PasswordAgeDays 180`. A idade da senha é um indicador para avaliação interna, não uma exigência universal de troca periódica. Use uma nova pasta por execução: relatórios de mesmo nome são sobrescritos.
+**Não é necessário declarar DCs, servidores ou pastas.** O comando detecta o domínio da máquina, consulta os servidores Windows habilitados e os DCs cadastrados no AD e executa as três etapas. Os relatórios ficam em **`C:\scriptsDC`**, criada automaticamente. Resultados anteriores são movidos para `C:\scriptsDC\History\<identificador>`.
+
+Comece pelo [guia rápido](Docs/Guia-Rapido.pt-BR.md). Para incluir processos, execute `.\Start-Audit.ps1 -ScanProcesses`.
+
+A descoberta cobre o domínio atual e usa o AD, sem varredura de IPs. Máquinas fora do domínio ou sem identificação de Windows Server no cadastro podem não aparecer. DCs são enumerados separadamente e incluídos. Nomes DNS ausentes são registrados; servidores inacessíveis geram falhas de coleta.
+
+Os scripts individuais também usam `C:\scriptsDC` por padrão. Dependências e riscos leem o levantamento dessa pasta; execute o levantamento primeiro. Parâmetros manuais continuam disponíveis apenas para uso avançado: `-Server`, `-ComputerName` (dependências), `-OutputFolder` e `-PrivilegedCsv` (dependências/riscos). As etapas individuais sobrescrevem seus relatórios sem arquivá-los.
 
 ## Relatórios e interpretação
 
@@ -45,6 +44,8 @@ Os CSVs usam UTF-8, ponto e vírgula como separador, cabeçalhos estáveis mesmo
 
 | Relatório | Conteúdo |
 | --- | --- |
+| `RunStatus.csv` | Situação das três etapas do comando principal; Completed exige revisão dos relatórios detalhados. |
+| `ServerDiscovery.csv` | Servidores/DCs descobertos e nomes DNS ausentes. |
 | `01-PrivilegedUsers.csv` | Uma linha por SID de usuário e grupo privilegiado de origem; inclui a identidade com domínio para cruzamento. |
 | `04-PrivilegedGroupSummary.csv` | Usuários encontrados, grupos percorridos e cobertura por grupo solicitado. Quando parcial, a contagem representa somente o que foi encontrado. |
 | `DiscoveryStatus.csv` | Grupos ausentes, objetos não suportados e falhas na leitura do diretório. |
@@ -73,7 +74,7 @@ Scripts/       Scripts de auditoria e funções compartilhadas
 Docs/          Fluxo de auditoria, solução de problemas e guia rápido
 Examples/      Apenas CSVs fictícios (EXAMPLE / example.test)
 Tests/         Testes sem rede e integração contínua no Windows
-Output/        Relatórios ignorados pelo Git; somente .gitkeep é versionado
+Output/        Pasta legada opcional; saída padrão em C:\scriptsDC
 ```
 
 Consulte o [fluxo de auditoria](Docs/Audit-Workflow.pt-BR.md) e a [solução de problemas](Docs/Troubleshooting.pt-BR.md). Execute os testes com `powershell.exe -NoProfile -File .\Tests\Test-Toolkit.ps1` e depois `powershell.exe -NoProfile -File .\Tests\Test-Workflow.ps1`. Eles verificam sintaxe, lógica e fluxos simulados; não substituem testes reais de AD/WinRM.

@@ -1,6 +1,35 @@
 # Shared helpers. No directory or server changes are performed.
 Set-StrictMode -Version Latest
 
+function Get-AuditServerTargets {
+    [CmdletBinding()]
+    param([string]$Server, [string]$OutputFolder = 'C:\scriptsDC')
+    Import-Module ActiveDirectory -ErrorAction Stop
+    if (!$Server) { $Server = (Get-ADDomain -Current LocalComputer -ErrorAction Stop).DNSRoot }
+    $targets = [System.Collections.Generic.List[object]]::new()
+    try {
+        $computers = @(Get-ADComputer -Server $Server -Filter 'Enabled -eq $true -and OperatingSystem -like "*Windows*Server*"' -Properties DNSHostName,OperatingSystem -ErrorAction Stop)
+        foreach ($computer in $computers) {
+            $state = 'Ready'
+            if (!$computer.DNSHostName) { $state = 'MissingDNSHostName' }
+            $targets.Add([pscustomobject]@{ Name = $computer.Name; DNSHostName = $computer.DNSHostName; Source = 'ADComputer'; Status = $state })
+        }
+        foreach ($dc in (Get-ADDomainController -Filter * -Server $Server -ErrorAction Stop)) {
+            $state = 'Ready'
+            if (!$dc.HostName) { $state = 'MissingDNSHostName' }
+            $targets.Add([pscustomobject]@{ Name = $dc.Name; DNSHostName = $dc.HostName; Source = 'DomainController'; Status = $state })
+        }
+    }
+    catch {
+        $targets.Add([pscustomobject]@{ Name = $Server; DNSHostName = ''; Source = 'Discovery'; Status = "Failed: $($_.Exception.Message)" })
+        Export-AuditCsv -Rows $targets.ToArray() -Columns Name,DNSHostName,Source,Status -Path (Join-Path $OutputFolder 'ServerDiscovery.csv')
+        throw
+    }
+    Export-AuditCsv -Rows $targets.ToArray() -Columns Name,DNSHostName,Source,Status -Path (Join-Path $OutputFolder 'ServerDiscovery.csv')
+    if (@($targets | Where-Object Status -ne 'Ready').Count) { Write-Warning 'Some AD computer objects have no DNS name. Review ServerDiscovery.csv.' }
+    $targets | Where-Object Status -eq 'Ready' | Select-Object -ExpandProperty DNSHostName | Sort-Object -Unique
+}
+
 function Export-AuditCsv {
     [CmdletBinding()]
     param([object[]]$Rows, [string[]]$Columns, [string]$Path)

@@ -4,6 +4,10 @@
 
 | Symptom | Check and action |
 | --- | --- |
+| Domain not detected | Run on a domain-joined computer with working AD DNS/connectivity. The computer's domain is used automatically. |
+| Server not discovered | Review ServerDiscovery.csv. Discovery selects enabled computer objects with Windows Server in OperatingSystem and separately enumerates DCs. Machines outside AD are not discovered. |
+| Cannot create C:\scriptsDC | Run with write permission to the default report directory. It is created automatically. |
+| Entry point fails | Review RunStatus.csv. Discovery failure stops later stages; dependency failure still allows risk checks. Old reports are archived in History. |
 | ActiveDirectory module missing | Use Windows PowerShell 5.1 and install approved RSAT AD tools through your normal administration process. |
 | DC lookup or AD query fails | Check the `-Server` value, DNS, AD Web Services connectivity, current identity and trust relationships. Inspect DiscoveryStatus or RiskQueryStatus. |
 | Forest-root groups fail | Verify root-domain connectivity and read permissions. Run each domain separately; a selected-domain run is not forest-wide coverage. |

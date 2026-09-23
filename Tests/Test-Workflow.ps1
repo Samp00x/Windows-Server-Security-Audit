@@ -4,12 +4,25 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $temp = Join-Path ([System.IO.Path]::GetTempPath()) ('audit-workflow-' + [guid]::NewGuid())
 $domainSid = 'S-1-5-21-1000000001-1000000002-1000000003'
+$failTargetDiscovery = $false
 function Import-Module { param($Name, $ErrorAction) }
 function Get-ADDomain {
-    param($Server)
+    param($Server,$Current,$ErrorAction)
     [pscustomobject]@{ DomainSID = $domainSid; NetBIOSName = 'EXAMPLE'; DNSRoot = 'example.test' }
 }
 function Get-ADForest { param($Server) [pscustomobject]@{ RootDomain = 'example.test' } }
+function Get-ADComputer {
+    param($Server,$Filter,$Properties,$ErrorAction)
+    if ($failTargetDiscovery) { throw 'Simulated AD computer query failure' }
+    [pscustomobject]@{ Name = 'app'; DNSHostName = 'app.example.test'; OperatingSystem = 'Windows Server 2022' }
+    [pscustomobject]@{ Name = 'offline'; DNSHostName = 'offline.example.test'; OperatingSystem = 'Windows Server 2022' }
+    [pscustomobject]@{ Name = 'dc'; DNSHostName = 'dc.example.test'; OperatingSystem = 'Windows Server 2022' }
+    [pscustomobject]@{ Name = 'missing'; DNSHostName = ''; OperatingSystem = 'Windows Server 2022' }
+}
+function Get-ADDomainController {
+    param($Server,$Filter,$ErrorAction)
+    [pscustomobject]@{ Name = 'dc'; HostName = 'dc.example.test' }
+}
 function Get-ADGroup {
     param($Identity, $Server)
     $name = 'Root'
@@ -63,10 +76,16 @@ function Invoke-Command {
     }
 }
 try {
-    & "$root/Scripts/Get-PrivilegedUsers.ps1" -Server example.test -OutputFolder $temp
+    & "$root/Start-Audit.ps1" -OutputFolder $temp
     $csv = Join-Path $temp '01-PrivilegedUsers.csv'
     $users = @(Import-Csv $csv -Delimiter ';')
     if ($users.Count -ne 2) { throw "Discovery expected 2 unique user/root pairs, got $($users.Count)." }
+    $run = @(Import-Csv (Join-Path $temp 'RunStatus.csv') -Delimiter ';')
+    if ($run.Count -ne 3 -or @($run | Where-Object Status -eq 'Failed').Count) { throw 'Automatic entry point failed.' }
+    $targets = @(Import-Csv (Join-Path $temp 'ServerDiscovery.csv') -Delimiter ';')
+    if (@($targets | Where-Object Status -eq 'MissingDNSHostName').Count -ne 1) { throw 'Missing DNS coverage not recorded.' }
+    $automaticScan = @(Import-Csv (Join-Path $temp '06-ServerScanStatus.csv') -Delimiter ';')
+    if ($automaticScan.Count -ne 15) { throw 'Automatic targets should include three unique servers, including the DC.' }
     if (@($users | Where-Object MembershipType -eq 'NestedPrimaryGroup').Count -ne 1) { throw 'Nested primary group not discovered.' }
     $summary = Import-Csv (Join-Path $temp '04-PrivilegedGroupSummary.csv') -Delimiter ';'
     if (@($summary | Where-Object { $_.Group -eq "$domainSid-512" -and $_.GroupsVisited -eq 2 -and $_.Status -eq 'Complete' }).Count -ne 1) { throw 'Cycle traversal summary incorrect.' }
@@ -78,11 +97,20 @@ try {
     & "$root/Scripts/Get-PrivilegedAccountRisks.ps1" -PrivilegedCsv $csv -OutputFolder $temp
     $risks = @(Import-Csv (Join-Path $temp '07-PrivilegedAccountRisks.csv') -Delimiter ';')
     if ($risks.Count -ne 2 -or $risks[0].Findings -notlike '*DoesNotRequirePreAuth*') { throw 'Risk integration incorrect.' }
-    Write-Output 'PASS: 6 simulated workflow checks. Remote collector bodies still require live lab validation.'
+    $failTargetDiscovery = $true
+    $failed = $false
+    try { & "$root/Start-Audit.ps1" -OutputFolder $temp } catch { $failed = $true }
+    if (!$failed) { throw 'Entry point must signal failed target discovery.' }
+    $retry = @(Import-Csv (Join-Path $temp 'RunStatus.csv') -Delimiter ';')
+    if (@($retry | Where-Object { $_.Stage -eq 'Risks' -and $_.Status -eq 'Completed' }).Count -ne 1) { throw 'Risk checks must continue after dependency discovery failure.' }
+    if (Test-Path (Join-Path $temp '05-PrivilegedAccountDependencies.csv')) { throw 'Old dependency results were not archived.' }
+    if (@(Get-ChildItem (Join-Path $temp 'History') -Filter '05-PrivilegedAccountDependencies.csv' -Recurse).Count -ne 1) { throw 'Previous results missing from history.' }
+    Write-Output 'PASS: 13 simulated workflow checks including automatic discovery, failure handling and history. Remote collector bodies still require live lab validation.'
 }
 finally {
     if (Test-Path -LiteralPath $temp) {
-        Get-ChildItem -LiteralPath $temp -File | ForEach-Object { Remove-Item -LiteralPath $_.FullName }
+        Get-ChildItem -LiteralPath $temp -File -Recurse | ForEach-Object { Remove-Item -LiteralPath $_.FullName }
+        Get-ChildItem -LiteralPath $temp -Directory -Recurse | Sort-Object { $_.FullName.Length } -Descending | ForEach-Object { Remove-Item -LiteralPath $_.FullName }
         Remove-Item -LiteralPath $temp
     }
 }

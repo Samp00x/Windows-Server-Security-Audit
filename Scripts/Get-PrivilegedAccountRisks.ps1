@@ -3,18 +3,19 @@
 .SYNOPSIS
 Re-queries discovered users by SID and exports review indicators and query status.
 .EXAMPLE
-.\Get-PrivilegedAccountRisks.ps1 -PrivilegedCsv C:\Audit\Run01\01-PrivilegedUsers.csv
+.\Get-PrivilegedAccountRisks.ps1
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][string]$PrivilegedCsv,
+    [string]$PrivilegedCsv,
     [ValidateRange(1,3650)][int]$InactiveDays = 90,
     [ValidateRange(1,3650)][int]$PasswordAgeDays = 180,
-    [string]$OutputFolder = (Join-Path $PSScriptRoot '../Output')
+    [string]$OutputFolder = 'C:\scriptsDC'
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/Audit.Common.ps1"
 Import-Module ActiveDirectory -ErrorAction Stop
+if (!$PrivilegedCsv) { $PrivilegedCsv = Join-Path $OutputFolder '01-PrivilegedUsers.csv' }
 $accounts = @(Import-AuditAccounts $PrivilegedCsv)
 $results = [System.Collections.Generic.List[object]]::new()
 $status = [System.Collections.Generic.List[object]]::new()

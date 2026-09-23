@@ -4,6 +4,10 @@
 
 | Sintoma | Verificação e ação |
 | --- | --- |
+| Domínio não detectado | Execute em máquina integrada ao domínio, com DNS/conectividade AD. O script usa o domínio da máquina, sem exigir o nome do DC. |
+| Servidor não descoberto | Revise ServerDiscovery.csv. A descoberta seleciona computadores habilitados com Windows Server no atributo OperatingSystem e enumera DCs separadamente. Máquinas fora do AD não são descobertas. |
+| Não consegue criar C:\scriptsDC | Execute com permissão de gravação nessa pasta. A pasta padrão é criada automaticamente. |
+| Execução principal falha | Confira RunStatus.csv. Falha no levantamento interrompe as próximas etapas; falha em dependências ainda permite tentar riscos. Relatórios antigos ficam em History. |
 | Módulo ActiveDirectory ausente | Use Windows PowerShell 5.1 e instale as ferramentas RSAT AD aprovadas pelo processo normal de administração. |
 | Falha ao localizar DC ou consultar AD | Confira `-Server`, DNS, conectividade com AD Web Services, identidade atual e relações de confiança. Examine DiscoveryStatus ou RiskQueryStatus. |
 | Falha nos grupos do domínio raiz | Verifique conectividade e leitura no domínio raiz. Execute cada domínio separadamente; uma execução não cobre automaticamente toda a floresta. |

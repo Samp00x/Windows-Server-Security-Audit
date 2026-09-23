@@ -1,25 +1,29 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-Scans an explicit server list for configured privileged account dependencies.
+Discovers servers through AD and scans configured privileged account dependencies.
 .DESCRIPTION
 Uses Windows PowerShell remoting. Collectors run independently and report gaps.
 Local Administrators is identified by SID; membership is direct only.
 .EXAMPLE
-.\Get-PrivilegedAccountDependencies.ps1 -PrivilegedCsv .\Output\01-PrivilegedUsers.csv -ComputerName web01.example.test -ScanProcesses
+.\Get-PrivilegedAccountDependencies.ps1
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][string]$PrivilegedCsv,
-    [Parameter(Mandatory)][ValidateNotNullOrEmpty()][string[]]$ComputerName,
+    [string]$PrivilegedCsv,
+    [ValidateNotNullOrEmpty()][string[]]$ComputerName,
+    [string]$Server,
     [pscredential]$Credential,
     [switch]$ScanProcesses,
     [ValidateRange(10,3600)][int]$OperationTimeoutSeconds = 180,
-    [string]$OutputFolder = (Join-Path $PSScriptRoot '../Output')
+    [string]$OutputFolder = 'C:\scriptsDC'
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/Audit.Common.ps1"
+if (!$PrivilegedCsv) { $PrivilegedCsv = Join-Path $OutputFolder '01-PrivilegedUsers.csv' }
 $accounts = @(Import-AuditAccounts $PrivilegedCsv)
+if (!$ComputerName) { $ComputerName = @(Get-AuditServerTargets -Server $Server -OutputFolder $OutputFolder) }
+if (!$ComputerName.Count) { throw 'No enabled Windows servers or domain controllers were found. Review ServerDiscovery.csv.' }
 $results = [System.Collections.Generic.List[object]]::new()
 $inventory = [System.Collections.Generic.List[object]]::new()
 $status = [System.Collections.Generic.List[object]]::new()

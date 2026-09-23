@@ -9,7 +9,7 @@ A read-only PowerShell toolkit for reviewing privileged AD users, locating serve
 | Script | Purpose |
 | --- | --- |
 | `Scripts/Get-PrivilegedUsers.ps1` | Discover users through direct, nested and primary-group membership; export a compact user report and group coverage summary. |
-| `Scripts/Get-PrivilegedAccountDependencies.ps1` | Inspect Services, Scheduled Tasks, IIS app pools, direct local Administrators, and optional running processes on an explicit server list. |
+| `Scripts/Get-PrivilegedAccountDependencies.ps1` | Inspect Services, Scheduled Tasks, IIS app pools, direct local Administrators, and optional running processes on servers discovered through AD or optionally supplied. |
 | `Scripts/Get-PrivilegedAccountRisks.ps1` | Re-query users by SID and flag disabled/stale accounts, password settings, Kerberos pre-authentication, delegation, SPNs and SID history. |
 
 Default groups: Domain Admins, Group Policy Creator Owners, Builtin Administrators, Account/Server/Print/Backup Operators, DnsAdmins, and forest-root Schema/Enterprise Admins. Add custom groups with `-AdditionalGroup`. Missing groups are reported as coverage gaps, including DnsAdmins when DNS is not deployed.
@@ -24,20 +24,17 @@ Default groups: Domain Admins, Group Policy Creator Owners, Builtin Administrato
 
 ## Quick start
 
-Clone or download this repository. Open Windows PowerShell at its root. Replace these fictitious names with your approved targets:
+Download and extract the repository. On a domain-joined computer, open **64-bit Windows PowerShell 5.1 as administrator**, enter the extracted folder and run:
 
 ```powershell
-$run = Join-Path $PWD ('Output/' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-.\Scripts\Get-PrivilegedUsers.ps1 -Server 'dc01.example.test' -OutputFolder $run
-
-# Review DiscoveryStatus.csv and 04-PrivilegedGroupSummary.csv before proceeding.
-$accounts = Join-Path $run '01-PrivilegedUsers.csv'
-.\Scripts\Get-PrivilegedAccountDependencies.ps1 -PrivilegedCsv $accounts `
-    -ComputerName 'app01.example.test','web01.example.test' -OutputFolder $run
-.\Scripts\Get-PrivilegedAccountRisks.ps1 -PrivilegedCsv $accounts -OutputFolder $run
+.\Start-Audit.ps1
 ```
 
-Add `-ScanProcesses` for a potentially expensive point-in-time process-owner scan. Use `-InactiveDays 90` and `-PasswordAgeDays 180` to tune review thresholds; password age is an organizational review signal, not a universal rotation requirement. Use a fresh folder for each run; matching report names are overwritten.
+No DC, server list or output path is required. The entry point detects the computer's domain, discovers enabled Windows Server computer objects and domain controllers through AD, and runs all three stages. Reports are written directly to **`C:\scriptsDC`**, created automatically. Previous reports are archived under `C:\scriptsDC\History\<run identifier>`.
+
+Use `.\Start-Audit.ps1 -ScanProcesses` to include process owners. Discovery covers the current AD domain, not IP ranges: machines outside AD or without a Windows Server OS attribute may be missed. DCs are enumerated separately and included. Missing DNS names and inaccessible targets remain visible in coverage reports.
+
+Individual scripts also default to `C:\scriptsDC`; dependencies and risks read the discovery CSV there. Run discovery first. Optional advanced overrides remain available: `-Server`, `-ComputerName` (dependencies), `-OutputFolder`, and `-PrivilegedCsv` (dependencies/risks). Individual scripts overwrite their own reports without archiving.
 
 ## Reports and interpretation
 
@@ -45,6 +42,8 @@ All CSVs use UTF-8, semicolon delimiters, stable headers (even with zero results
 
 | Report | Meaning |
 | --- | --- |
+| `RunStatus.csv` | Entry-point stage outcomes; Completed still requires reviewing detailed coverage. |
+| `ServerDiscovery.csv` | Discovered servers/DCs and missing DNS names. |
 | `01-PrivilegedUsers.csv` | One row per user SID and privileged root group; includes domain-qualified identity for matching. |
 | `04-PrivilegedGroupSummary.csv` | Users found, groups visited and coverage per requested group. Counts are lower bounds when partial. |
 | `DiscoveryStatus.csv` | Missing groups, unsupported objects and failed directory reads. |
@@ -73,7 +72,7 @@ Scripts/       Audit scripts and shared helpers
 Docs/          Audit workflow and troubleshooting
 Examples/      Fictitious example CSVs only (EXAMPLE / example.test)
 Tests/         Offline regression checks and Windows CI
-Output/        Ignored runtime reports; only .gitkeep is tracked
+Output/        Optional legacy folder; default reports go to C:\scriptsDC
 ```
 
 See [Audit workflow](Docs/Audit-Workflow.md) and [Troubleshooting](Docs/Troubleshooting.md). Run offline checks with `powershell.exe -NoProfile -File .\Tests\Test-Toolkit.ps1`, then `powershell.exe -NoProfile -File .\Tests\Test-Workflow.ps1`. These check syntax, key logic and simulated workflows; they do not replace a live AD/WinRM test.

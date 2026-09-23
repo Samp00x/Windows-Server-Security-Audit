@@ -6,18 +6,19 @@ Exports privileged AD users and group coverage without changing AD.
 Traverses nested groups with cycle detection and checks primaryGroupID.
 Queries the selected domain plus forest-root privileged groups.
 .EXAMPLE
-.\Get-PrivilegedUsers.ps1 -Server dc01.example.test -OutputFolder C:\Audit\Run01
+.\Get-PrivilegedUsers.ps1
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][string]$Server,
+    [string]$Server,
     [string[]]$AdditionalGroup = @(),
     [ValidateRange(1,3650)][int]$InactiveDays = 90,
-    [string]$OutputFolder = (Join-Path $PSScriptRoot '../Output')
+    [string]$OutputFolder = 'C:\scriptsDC'
 )
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot/Audit.Common.ps1"
 Import-Module ActiveDirectory -ErrorAction Stop
+if (!$Server) { $Server = (Get-ADDomain -Current LocalComputer).DNSRoot }
 $domain = Get-ADDomain -Server $Server
 $forest = Get-ADForest -Server $Server
 $rows = [System.Collections.Generic.List[object]]::new()
