@@ -7,3 +7,5 @@ Todos os valores destes CSVs são inventados. EXAMPLE, example.test e os SIDs de
 O exemplo contém uma identidade de serviço privilegiada, uma dependência em serviço parado e um indicador de revisão de senha. Uma situação de sucesso do coletor indica somente que a consulta terminou. Relatórios de execução devem ficar fora de Examples.
 
 Os CSVs mantêm seus nomes, cabeçalhos e valores técnicos em inglês para compatibilidade com os scripts. A explicação de cada relatório está no [README em português](../README.pt-BR.md#relatórios-e-interpretação).
+
+Os dois arquivos `02-*.csv` são um cenário fictício independente: Domain Admins alcança alice diretamente e por Team A/Team B → Shared. Bob tem Shared como grupo primário. As rotas alternativas são mantidas mesmo quando passam por Shared. As duas contas estão desabilitadas, mas alice tem logon replicado recente; estado da conta e atividade são separados. A planilha gerada usa as mesmas colunas do CSV de revisão. `Tests/Test-MembershipPaths.ps1` gera e valida o XLSX sem consultar dados reais do AD.

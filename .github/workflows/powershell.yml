@@ -12,3 +12,4 @@ jobs:
         run: |
           ./Tests/Test-Toolkit.ps1
           ./Tests/Test-Workflow.ps1
+          ./Tests/Test-MembershipPaths.ps1

@@ -36,9 +36,27 @@ Comece pelo [guia rápido](Docs/Guia-Rapido.pt-BR.md). Para incluir processos, e
 
 A descoberta cobre o domínio atual e usa o AD, sem varredura de IPs. Máquinas fora do domínio ou sem identificação de Windows Server no cadastro podem não aparecer. DCs são enumerados separadamente e incluídos. Nomes DNS ausentes são registrados; servidores inacessíveis geram falhas de coleta.
 
-Os scripts individuais também usam `C:\scriptsDC` por padrão. Dependências e riscos leem o levantamento dessa pasta; execute o levantamento primeiro. Parâmetros manuais continuam disponíveis apenas para uso avançado: `-Server`, `-ComputerName` (dependências), `-OutputFolder` e `-PrivilegedCsv` (dependências/riscos). As etapas individuais sobrescrevem seus relatórios sem arquivá-los.
+Os scripts individuais também usam `C:\scriptsDC` por padrão. Dependências e riscos leem o levantamento dessa pasta; execute o levantamento primeiro. Parâmetros manuais continuam disponíveis apenas para uso avançado: `-Server`, `-ComputerName` (dependências), `-OutputFolder` e `-PrivilegedCsv` (dependências/riscos). As etapas individuais regeneram seus CSVs; o levantamento preserva a planilha de revisão anterior em History.
 
 ## Relatórios e interpretação
+
+### Caminhos de associação e revisão do responsável
+
+O levantamento agora também gera:
+
+- **02-MembershipPaths.csv**: cada caminho simples distinto de um grupo administrativo selecionado até o usuário, incluindo rotas alternativas e grupo primário. Direção: grupo administrativo → grupos aninhados → usuário. `Depth` conta as associações (1 = direta). DNs/SIDs distinguem grupos de mesmo nome. Ciclos interrompem somente o ramo atual e são registrados como `CycleDetected`; outras rotas continuam. Caminhos que repetem grupos seriam infinitos e não são enumerados.
+- **02-PrivilegedUserReview.xlsx** e **02-PrivilegedUserReview.csv**: uma linha por SID de usuário, consolidando UPN, `AccountStatus` (status da conta), `LastLogonDate` (último logon aproximado), `PasswordLastSet` (última troca de senha), `LoginActivity` (atividade de login), `DirectAdministrativeGroups` (grupos administrativos diretos), `IndirectPaths` (caminhos indiretos), `OwnerDecision` (decisão do responsável), `Notes` (observações) e cobertura. Decisão e observações ficam em branco para preenchimento. Grupos diretos são os grupos de origem selecionados aos quais o usuário pertence diretamente, inclusive por grupo primário. O XLSX tem filtros, cabeçalho fixo, quebra de texto, campos editáveis destacados e uma aba Collection. Não exige Excel instalado nem download de módulo.
+- **DiscoveryRun.csv**: cobertura global, situação da geração do XLSX, data e contagens, inclusive em execuções vazias. Confira antes de considerar a revisão completa.
+
+`AccountStatus` (Enabled/Disabled/Unknown) é independente de `LoginActivity`. Uma conta desabilitada pode ter logon recente. `Active` significa registro replicado dentro de `InactiveDays`, não uma sessão aberta. **LastLogonDate deriva do lastLogonTimestamp replicado e aproximado**, podendo estar defasado; campo vazio não prova que a conta nunca entrou. O XLSX armazena datas no horário local da máquina de coleta; os CSVs usam ISO 8601. Veja a [referência Microsoft](https://learn.microsoft.com/en-us/windows/win32/adschema/a-lastlogontimestamp).
+
+Falhas de leitura de grupos, membros, grupos primários e usuários ficam em `DiscoveryStatus.csv`; os demais ramos continuam. Grupos de origem afetados e suas linhas de caminhos ficam como Partial. **Todas as linhas da revisão** ficam como Partial se houver qualquer lacuna no escopo selecionado, pois evidência ausente pode afetar qualquer usuário. Detalhes não lidos permanecem visíveis como Unknown, com `UserDetailsStatus=Failed`, mas não entram no CSV 01, como antes. Objetos não resolvidos sem SID de usuário aparecem no relatório de status, sem criação de uma conta fictícia. Principais externos ainda precisam de revisão manual.
+
+O CSV 01 mantém **nomes e ordem das colunas e uma linha por usuário/grupo de origem**, preservando a entrada dos scripts de dependências e riscos. `Enabled` informa o estado da conta; `ActivityStatus` passa a representar apenas atividade de login, mesmo em contas desabilitadas. Havendo associação direta e indireta, o CSV 01 apresenta a direta; o CSV 02 conserva todas as rotas. O Start-Audit marca Discovery como Partial em lacunas de coleta/exportação e executa as próximas etapas com o subconjunto conhecido de usuários.
+
+O comando padrão e a saída em `C:\scriptsDC` continuam iguais. O Start-Audit arquiva os novos relatórios. Ao repetir apenas o levantamento, a planilha anterior é preservada em `History/workbook-*` para não perder decisões preenchidas; os CSVs são regenerados. Guarde uma cópia da revisão concluída. O XLSX não é truncado silenciosamente: exceder 32.767 caracteres por célula ou o limite de linhas do Excel gera falha explícita, mantendo o CSV completo. Muitos caminhos podem exigir bastante tempo/memória; não há corte arbitrário de quantidade ou profundidade. A altura máxima de linha do Excel pode limitar o texto visível; use a barra de fórmulas ou o CSV para rotas longas.
+
+Além dos testes existentes, execute `powershell.exe -NoProfile -File .\Tests\Test-MembershipPaths.ps1`. Ele cobre rotas alternativas, ciclos, grupos primários, coleta parcial, contrato do CSV 01, relatórios vazios e integridade do XLSX.
 
 Os CSVs usam UTF-8, ponto e vírgula como separador, cabeçalhos estáveis mesmo sem resultados e datas no formato ISO 8601 quando exportadas. Importe com `Import-Csv -Delimiter ';'`. Os nomes de arquivos, parâmetros, colunas e valores continuam em inglês para manter compatibilidade com os scripts.
 

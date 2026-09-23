@@ -18,7 +18,7 @@ $ErrorActionPreference = 'Stop'
 Import-Module ActiveDirectory -ErrorAction Stop
 if (!$Server) { $Server = (Get-ADDomain -Current LocalComputer -ErrorAction Stop).DNSRoot }
 New-Item -ItemType Directory -Path $OutputFolder -Force -ErrorAction Stop | Out-Null
-$reportNames = @('01-PrivilegedUsers.csv','04-PrivilegedGroupSummary.csv','DiscoveryStatus.csv','05-PrivilegedAccountDependencies.csv','06-ServerScanStatus.csv','DependencyInventory.csv','07-PrivilegedAccountRisks.csv','RiskQueryStatus.csv','ServerDiscovery.csv','RunStatus.csv')
+$reportNames = @('01-PrivilegedUsers.csv','02-MembershipPaths.csv','02-PrivilegedUserReview.csv','02-PrivilegedUserReview.xlsx','DiscoveryRun.csv','04-PrivilegedGroupSummary.csv','DiscoveryStatus.csv','05-PrivilegedAccountDependencies.csv','06-ServerScanStatus.csv','DependencyInventory.csv','07-PrivilegedAccountRisks.csv','RiskQueryStatus.csv','ServerDiscovery.csv','RunStatus.csv')
 $outputRoot = (Resolve-Path -LiteralPath $OutputFolder).Path
 $archive = Join-Path $outputRoot ('History/' + (Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + [guid]::NewGuid().ToString('N').Substring(0,8))
 foreach ($name in $reportNames) {
@@ -45,7 +45,12 @@ foreach ($stage in @('Discovery','Dependencies','Risks')) {
             }
             'Risks' { & "$PSScriptRoot/Scripts/Get-PrivilegedAccountRisks.ps1" -OutputFolder $OutputFolder }
         }
-        $stages.Add([pscustomobject]@{ Stage = $stage; Status = 'Completed'; Message = 'Review detailed coverage reports; Completed does not mean every query succeeded.' })
+        $stageStatus = 'Completed'
+        if ($stage -eq 'Discovery') {
+            $discoveryRun = Import-Csv -LiteralPath (Join-Path $OutputFolder 'DiscoveryRun.csv') -Delimiter ';'
+            if ($discoveryRun.CollectionStatus -ne 'Complete' -or $discoveryRun.WorkbookStatus -ne 'Success') { $stageStatus = 'Partial' }
+        }
+        $stages.Add([pscustomobject]@{ Stage = $stage; Status = $stageStatus; Message = 'Review detailed coverage reports; downstream stages use only discovered users.' })
     }
     catch {
         $stages.Add([pscustomobject]@{ Stage = $stage; Status = 'Failed'; Message = $_.Exception.Message })

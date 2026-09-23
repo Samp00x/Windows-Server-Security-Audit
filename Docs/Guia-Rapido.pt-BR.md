@@ -24,13 +24,19 @@ Sempre em **`C:\scriptsDC`**, por padrão. A pasta é criada automaticamente.
 | Abra este arquivo | Para ver |
 | --- | --- |
 | `01-PrivilegedUsers.csv` | Quem possui privilégios e por quais grupos. |
+| `02-PrivilegedUserReview.xlsx` | Uma linha por usuário para preencher decisão e observações. Confira CollectionStatus e a aba Collection. |
+| `02-PrivilegedUserReview.csv` | A mesma revisão em CSV. |
+| `02-MembershipPaths.csv` | Cada caminho direto/indireto, incluindo rotas alternativas. |
+| `DiscoveryRun.csv` | Cobertura global e situação da geração da planilha. |
 | `05-PrivilegedAccountDependencies.csv` | Onde essas contas estão configuradas: serviços, tarefas, IIS e Administradores locais diretos. |
 | `07-PrivilegedAccountRisks.csv` | Quais configurações das contas precisam de revisão. |
 | `RunStatus.csv` | Quais etapas terminaram ou falharam. |
 | `06-ServerScanStatus.csv` | Quais consultas funcionaram ou falharam em cada servidor. |
 | `ServerDiscovery.csv` | Quais servidores/DCs o AD forneceu e quais não tinham nome DNS. |
 
-Confira também `DiscoveryStatus.csv`, `04-PrivilegedGroupSummary.csv` e `RiskQueryStatus.csv` para identificar lacunas. `Completed` em RunStatus significa que a etapa terminou; ainda pode haver falhas individuais nos relatórios detalhados.
+Confira também `DiscoveryStatus.csv`, `04-PrivilegedGroupSummary.csv` e `RiskQueryStatus.csv` para identificar lacunas. Discovery fica Partial no RunStatus quando há lacunas de coleta ou exportação. As próximas etapas usam apenas os usuários encontrados.
+
+`AccountStatus` informa se a conta está habilitada; `LoginActivity` informa atividade de login separadamente. `LastLogonDate` é replicado e aproximado. Uma conta desabilitada pode ter logon recente, e data ausente não comprova falta de uso. Ciclos são registrados como CycleDetected e não eliminam rotas alternativas válidas.
 
 Ao executar novamente o comando principal, os relatórios anteriores são movidos para **`C:\scriptsDC\History\<identificador da execução>`**. Os novos ficam diretamente em `C:\scriptsDC`.
 
@@ -67,6 +73,6 @@ Depois do primeiro levantamento, você pode repetir uma etapa sem preencher cami
 .\Scripts\Get-PrivilegedAccountRisks.ps1
 ```
 
-As etapas individuais sobrescrevem seus próprios relatórios; o histórico automático é feito pelo comando principal. Se não houver levantamento válido, dependências/riscos pedem que a entrada seja corrigida; execute primeiro `Start-Audit.ps1` ou `Get-PrivilegedUsers.ps1`.
+As etapas individuais regeneram seus CSVs; a planilha anterior fica em History/workbook-* para preservar decisões preenchidas. O comando principal arquiva todos os relatórios. Se não houver levantamento válido, dependências/riscos pedem que a entrada seja corrigida; execute primeiro `Start-Audit.ps1` ou `Get-PrivilegedUsers.ps1`.
 
 **Antes de retirar privilégios**, valide com o responsável pela conta/aplicação. Não encontrar correspondências não prova ausência de uso: grupos locais não são expandidos e há tipos de aplicações fora do escopo. Veja o [fluxo completo](Audit-Workflow.pt-BR.md).

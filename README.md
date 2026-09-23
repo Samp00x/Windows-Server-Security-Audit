@@ -34,9 +34,27 @@ No DC, server list or output path is required. The entry point detects the compu
 
 Use `.\Start-Audit.ps1 -ScanProcesses` to include process owners. Discovery covers the current AD domain, not IP ranges: machines outside AD or without a Windows Server OS attribute may be missed. DCs are enumerated separately and included. Missing DNS names and inaccessible targets remain visible in coverage reports.
 
-Individual scripts also default to `C:\scriptsDC`; dependencies and risks read the discovery CSV there. Run discovery first. Optional advanced overrides remain available: `-Server`, `-ComputerName` (dependencies), `-OutputFolder`, and `-PrivilegedCsv` (dependencies/risks). Individual scripts overwrite their own reports without archiving.
+Individual scripts also default to `C:\scriptsDC`; dependencies and risks read the discovery CSV there. Run discovery first. Optional advanced overrides remain available: `-Server`, `-ComputerName` (dependencies), `-OutputFolder`, and `-PrivilegedCsv` (dependencies/risks). Individual scripts regenerate CSV reports; discovery preserves the previous review workbook in History.
 
 ## Reports and interpretation
+
+### Membership paths and owner review
+
+Discovery now also generates:
+
+- **02-MembershipPaths.csv**: every distinct simple path from a selected administrative group to a user, including alternative routes and primary-group membership. Direction: root group → nested groups → user. `Depth` counts membership edges (1 = direct). Group DNs/SIDs distinguish same-named groups. Cycles stop only the current branch and are logged as `CycleDetected`; alternate routes remain eligible. Paths repeating a group would be infinite and are not enumerated.
+- **02-PrivilegedUserReview.xlsx** and **02-PrivilegedUserReview.csv**: one row per user SID across all roots. Columns include UPN, `AccountStatus`, `LastLogonDate`, `PasswordLastSet`, `LoginActivity`, `DirectAdministrativeGroups`, `IndirectPaths`, blank `OwnerDecision`/`Notes`, and coverage. Direct administrative groups are the selected roots to which the user belongs directly, including primary membership. XLSX includes filters, frozen headers, wrapped paths, highlighted editable fields and a Collection sheet. No Excel installation or downloaded module is required.
+- **DiscoveryRun.csv**: overall coverage, workbook export status, timestamp and counts, including empty runs. Read this before treating the review as complete.
+
+`AccountStatus` (Enabled/Disabled/Unknown) is separate from `LoginActivity`. A disabled account can have recent logon evidence. `Active` means a replicated timestamp within `InactiveDays`, not a current session. **LastLogonDate derives from replicated, approximate lastLogonTimestamp** and can lag; an empty value does not prove the account has never logged on. XLSX stores typed dates in the collection host's local time; CSV dates use ISO 8601. See [Microsoft's attribute reference](https://learn.microsoft.com/en-us/windows/win32/adschema/a-lastlogontimestamp).
+
+Failed group/member/primary-group/user reads go to `DiscoveryStatus.csv`; other branches continue. Affected roots and their path rows are Partial. **All review rows** are Partial if any selected scope is incomplete, because missing evidence could affect any user. Unreadable user details remain visible as Unknown with Failed `UserDetailsStatus`, but are omitted from CSV 01 as before. Unresolved objects without a user SID appear in the status report rather than an invented user row. Foreign principals still need manual review.
+
+CSV 01 retains its **column names, order and one-row-per-user/root contract** for dependencies and risks. `Enabled` carries account state; `ActivityStatus` now represents only login evidence, even for disabled users. With both direct and indirect routes, CSV 01 prefers direct membership while CSV 02 preserves every route. Start-Audit marks Discovery as Partial for collection/export gaps and continues downstream stages with the known user subset.
+
+The default command and `C:\scriptsDC` destination are unchanged. Start-Audit archives the new reports. Individual discovery reruns preserve the previous XLSX under `History/workbook-*` to protect owner edits; CSVs are regenerated. Save your reviewed copy separately. The workbook is never silently truncated: Excel's 32,767-character cell limit or row limit produces an export failure while the full CSV remains available. Many paths can consume substantial time/memory; no arbitrary path/depth cutoff is applied. Excel's maximum row height can limit visible text; use the formula bar or path CSV for long routes.
+
+Run `powershell.exe -NoProfile -File .\Tests\Test-MembershipPaths.ps1` in addition to the existing tests. It covers alternate paths, cycles, primary groups, partial collection, CSV 01 compatibility, empty reports and XLSX integrity.
 
 All CSVs use UTF-8, semicolon delimiters, stable headers (even with zero results) and ISO 8601 date values where exported. Import with `Import-Csv -Delimiter ';'`.
 

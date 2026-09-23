@@ -5,6 +5,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $temp = Join-Path ([System.IO.Path]::GetTempPath()) ('audit-workflow-' + [guid]::NewGuid())
 $domainSid = 'S-1-5-21-1000000001-1000000002-1000000003'
 $failTargetDiscovery = $false
+$failMembershipRead = $false
 function Import-Module { param($Name, $ErrorAction) }
 function Get-ADDomain {
     param($Server,$Current,$ErrorAction)
@@ -54,6 +55,7 @@ function Get-ADGroupMember {
         Get-ADGroup -Identity 'CN=Nested,DC=example,DC=test'
     }
     elseif ($Identity.SID.Value -eq "$domainSid-1200") {
+        if ($failMembershipRead) { throw 'Simulated nested membership denial' }
         Get-ADGroup -Identity 'CN=Root,DC=example,DC=test'
         Get-ADUser -Identity demo
     }
@@ -105,7 +107,14 @@ try {
     if (@($retry | Where-Object { $_.Stage -eq 'Risks' -and $_.Status -eq 'Completed' }).Count -ne 1) { throw 'Risk checks must continue after dependency discovery failure.' }
     if (Test-Path (Join-Path $temp '05-PrivilegedAccountDependencies.csv')) { throw 'Old dependency results were not archived.' }
     if (@(Get-ChildItem (Join-Path $temp 'History') -Filter '05-PrivilegedAccountDependencies.csv' -Recurse).Count -ne 1) { throw 'Previous results missing from history.' }
-    Write-Output 'PASS: 13 simulated workflow checks including automatic discovery, failure handling and history. Remote collector bodies still require live lab validation.'
+    if (@(Get-ChildItem (Join-Path $temp 'History') -Filter '02-PrivilegedUserReview.xlsx' -Recurse).Count -ne 1) { throw 'Review workbook missing from history.' }
+    $failTargetDiscovery = $false
+    $failMembershipRead = $true
+    & "$root/Start-Audit.ps1" -OutputFolder $temp
+    $partialRun = @(Import-Csv (Join-Path $temp 'RunStatus.csv') -Delimiter ';')
+    if (@($partialRun | Where-Object { $_.Stage -eq 'Discovery' -and $_.Status -eq 'Partial' }).Count -ne 1) { throw 'Partial discovery must propagate to RunStatus.' }
+    if (@($partialRun | Where-Object { $_.Stage -eq 'Risks' -and $_.Status -eq 'Completed' }).Count -ne 1) { throw 'Partial discovery should retain downstream compatibility.' }
+    Write-Output 'PASS: 16 simulated workflow checks including partial discovery and review workbook history. Remote collector bodies still require live lab validation.'
 }
 finally {
     if (Test-Path -LiteralPath $temp) {
